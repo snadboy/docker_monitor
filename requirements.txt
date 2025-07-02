@@ -1,0 +1,30 @@
+# Enhanced Docker Monitor - Core Dependencies
+# Production-ready Docker container monitoring with health tracking
+
+# Core Docker integration
+docker>=6.0.0
+
+# Web framework for REST API
+flask>=2.0.0
+
+# HTTP client for external APIs (Caddy Admin API)
+requests>=2.25.0
+
+# Optional SSH support (uncomment if needed)
+# paramiko>=2.7.0
+
+# Development dependencies (optional)
+# pytest>=6.0.0
+# pytest-cov>=2.10.0
+# black>=21.0.0
+# flake8>=3.8.0
+# mypy>=0.800
+
+# Documentation dependencies (optional)
+# sphinx>=3.5.0
+# sphinx-rtd-theme>=0.5.0
+# myst-parser>=0.13.0
+
+# Monitoring dependencies (optional)
+# prometheus-client>=0.8.0
+# psutil>=5.7.0
