@@ -133,7 +133,9 @@ PACKAGE_INFO = {
     'supported_python': '>=3.7',
     'dependencies': [
         'docker>=6.0.0',
-        'flask>=2.0.0', 
+        'fastapi>=0.104.0',
+        'uvicorn[standard]>=0.24.0',
+        'pydantic>=2.0.0',
         'requests>=2.25.0'
     ],
     'optional_dependencies': {

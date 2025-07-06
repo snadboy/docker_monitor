@@ -45,7 +45,9 @@ def read_requirements(filename="requirements.txt"):
 # Core dependencies
 INSTALL_REQUIRES = [
     "docker>=6.0.0",
-    "flask>=2.0.0",
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "pydantic>=2.0.0",
     "requests>=2.25.0",
 ]
 
@@ -139,7 +141,7 @@ KEYWORDS = [
     "devops",
     "infrastructure",
     "api",
-    "flask",
+    "fastapi",
     "kubernetes",
     "docker-compose",
 ]

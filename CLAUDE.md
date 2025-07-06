@@ -62,7 +62,7 @@ This is a **production-ready Docker container monitoring system** with both CLI 
 - `DockerHostManager` - Host management with error tracking/recovery
 - `CaddyManager` - Reverse proxy configuration via Caddy Admin API
 
-**API Layer**: Flask REST API (`api_server.py`) with comprehensive endpoints for monitoring and debugging
+**API Layer**: FastAPI REST API (`api_server.py`) with comprehensive endpoints for monitoring and debugging. FastAPI provides automatic validation, async support, and built-in API documentation at `/docs`.
 
 ### Key Patterns
 

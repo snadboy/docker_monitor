@@ -16,7 +16,6 @@ from typing import Dict, List, Optional
 
 from .managers import DockerHostManager, SSHSetupManager
 from .processors import ContainerProcessor, CaddyManager
-from .api_server import APIServer
 
 
 class DockerMonitor:
@@ -42,6 +41,7 @@ class DockerMonitor:
         self.caddy_sync_interval = config.get('caddy_sync_interval', 15)  # seconds
         
         # API server (will be started in separate thread)
+        from .api_server import APIServer
         self.api_server = APIServer(self.monitored_containers, self.host_manager, self.logger, config, self.container_processor)
         # Pass caddy_manager reference to API server for status endpoints
         self.api_server.caddy_manager = self.caddy_manager

@@ -1,14 +1,16 @@
 """
-Flask REST API Server
+FastAPI REST API Server
 
-This module provides the Flask-based REST API server with health endpoints,
+This module provides the FastAPI-based REST API server with health endpoints,
 container discovery, service management, and a web dashboard.
 """
 
-from flask import Flask, jsonify, request
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse, JSONResponse
 from datetime import datetime
-from typing import Dict, TYPE_CHECKING
+from typing import Dict, List, Optional, Any, TYPE_CHECKING
 import logging
+from pydantic import BaseModel
 
 if TYPE_CHECKING:
     from .managers import DockerHostManager
@@ -17,8 +19,53 @@ if TYPE_CHECKING:
 from .schemas import get_planned_services
 
 
+# Pydantic models for response validation
+class HealthStatus(BaseModel):
+    status: str
+    timestamp: str
+    uptime_seconds: float
+    docker_hosts: Dict[str, Any]
+    persistent_errors: Optional[Dict[str, Any]]
+    monitored_containers: int
+    caddy: Dict[str, Any]
+    version: str
+
+
+class ContainerInfo(BaseModel):
+    name: str
+    short_id: str
+    status: str
+    host_ip: Optional[str]
+    docker_host_name: str
+    snadboy_labels: Dict[str, str]
+    primary_docker_ip: Optional[str]
+    docker_networks: Dict[str, Any]
+    docker_ips: List[str]
+    exposed_ports: List[str]
+
+
+class ContainersResponse(BaseModel):
+    containers: List[Dict[str, Any]]
+    count: int
+
+
+class SimpleHealthResponse(BaseModel):
+    status: str
+    connected_hosts: Optional[int] = None
+    reason: Optional[str] = None
+    failed_hosts: Optional[List[str]] = None
+
+
+class ReadinessResponse(BaseModel):
+    status: str
+    connected_hosts: Optional[int] = None
+    total_containers: Optional[int] = None
+    reason: Optional[str] = None
+    error: Optional[str] = None
+
+
 class APIServer:
-    """Flask REST API server with enhanced health endpoints"""
+    """FastAPI REST API server with enhanced health endpoints"""
     
     def __init__(self, monitored_containers: Dict, host_manager: 'DockerHostManager', logger: logging.Logger, config: Dict, container_processor: 'ContainerProcessor' = None):
         self.monitored_containers = monitored_containers
@@ -26,7 +73,7 @@ class APIServer:
         self.logger = logger
         self.config = config
         self.container_processor = container_processor
-        self.app = self._setup_flask_app()
+        self.app = self._setup_fastapi_app()
         self.start_time = datetime.now()
         self.caddy_manager = None  # Will be set externally if Caddy is enabled
     
@@ -43,14 +90,19 @@ class APIServer:
         else:
             return {'enabled': False}
     
-    def _setup_flask_app(self) -> Flask:
-        """Setup Flask application with all endpoints"""
-        app = Flask(__name__)
-        app.logger.disabled = True
+    def _setup_fastapi_app(self) -> FastAPI:
+        """Setup FastAPI application with all endpoints"""
+        app = FastAPI(
+            title="Enhanced Docker Monitor API",
+            description="Production-ready Docker container monitoring with persistent error tracking, intelligent connection recovery, and service registry validation",
+            version="2.5.0-enhanced-health",
+            docs_url="/docs",
+            redoc_url="/redoc"
+        )
         
-        @app.route('/', methods=['GET'])
-        @app.route('/help', methods=['GET'])
-        def api_help():
+        @app.get("/", response_model=Dict[str, Any])
+        @app.get("/help", response_model=Dict[str, Any])
+        async def api_help():
             """API documentation and endpoint discovery"""
             endpoints = {
                 'health_monitoring': {
@@ -86,7 +138,7 @@ class APIServer:
                         'response': 'Array of container objects with metadata',
                         'http_codes': '200'
                     },
-                    '/containers/<id>': {
+                    '/containers/{id}': {
                         'method': 'GET',
                         'description': 'Get specific container details by ID or short ID',
                         'response': 'Single container object',
@@ -212,11 +264,11 @@ class APIServer:
                 }
             }
             
-            return jsonify({
+            return {
                 'service_name': 'Enhanced Docker Monitor API',
                 'version': '2.5.0-enhanced-health',
                 'description': 'Production-ready Docker container monitoring with persistent error tracking, intelligent connection recovery, and service registry validation',
-                'base_url': request.base_url.rstrip('/'),
+                'base_url': str(self.config.get('api_base_url', 'http://localhost:8080')),
                 'endpoints': endpoints,
                 'usage_examples': usage_examples,
                 'service_labels': service_example,
@@ -241,15 +293,15 @@ class APIServer:
                 },
                 'documentation': 'See README.md for complete documentation and deployment guides',
                 'timestamp': datetime.now().isoformat()
-            })
+            }
         
-        @app.route('/dashboard', methods=['GET'])
-        def web_dashboard():
+        @app.get("/dashboard", response_class=HTMLResponse)
+        async def web_dashboard():
             """Web dashboard for container monitoring"""
             return self._get_dashboard_html()
         
-        @app.route('/health', methods=['GET'])
-        def health_check():
+        @app.get("/health", response_model=HealthStatus, responses={503: {"model": HealthStatus}})
+        async def health_check():
             """Enhanced health check with persistent error tracking"""
             connected_hosts = 0
             failed_hosts = 0
@@ -288,32 +340,37 @@ class APIServer:
             
             uptime = (datetime.now() - self.start_time).total_seconds()
             
-            response_data = {
-                'status': overall_status,
-                'timestamp': datetime.now().isoformat(),
-                'uptime_seconds': uptime,
-                'docker_hosts': {
+            response_data = HealthStatus(
+                status=overall_status,
+                timestamp=datetime.now().isoformat(),
+                uptime_seconds=uptime,
+                docker_hosts={
                     'total': total_hosts,
                     'connected': connected_hosts,
                     'failed': failed_hosts,
                     'status_details': host_status
                 },
-                'persistent_errors': host_errors if host_errors else None,
-                'monitored_containers': len(self.monitored_containers),
-                'caddy': self._get_caddy_health_status(),
-                'version': '2.5.0-enhanced-health'
-            }
+                persistent_errors=host_errors if host_errors else None,
+                monitored_containers=len(self.monitored_containers),
+                caddy=self._get_caddy_health_status(),
+                version='2.5.0-enhanced-health'
+            )
             
-            return jsonify(response_data), http_status
+            if http_status == 503:
+                return JSONResponse(content=response_data.dict(), status_code=503)
+            return response_data
         
-        @app.route('/healthz', methods=['GET'])
-        def kubernetes_health():
+        @app.get("/healthz", response_model=SimpleHealthResponse, responses={503: {"model": SimpleHealthResponse}})
+        async def kubernetes_health():
             """Kubernetes-style health check that returns appropriate HTTP codes"""
             connected_hosts = len([h for h in self.host_manager.hosts.values() if h.status == 'connected'])
             
             if connected_hosts == 0:
                 # No Docker hosts available - container should be marked unhealthy
-                return jsonify({'status': 'unhealthy', 'reason': 'no_docker_hosts'}), 503
+                return JSONResponse(
+                    content={'status': 'unhealthy', 'reason': 'no_docker_hosts'},
+                    status_code=503
+                )
             
             # Check for critical errors (hosts with persistent failures)
             critical_errors = [
@@ -323,45 +380,54 @@ class APIServer:
             
             if len(critical_errors) >= connected_hosts:
                 # All connected hosts have critical errors
-                return jsonify({'status': 'unhealthy', 'reason': 'critical_host_errors', 'failed_hosts': critical_errors}), 503
+                return JSONResponse(
+                    content={'status': 'unhealthy', 'reason': 'critical_host_errors', 'failed_hosts': critical_errors},
+                    status_code=503
+                )
             
             # Service is healthy enough to handle requests
-            return jsonify({'status': 'healthy', 'connected_hosts': connected_hosts}), 200
+            return SimpleHealthResponse(status='healthy', connected_hosts=connected_hosts)
         
-        @app.route('/readiness', methods=['GET'])  
-        def readiness_check():
+        @app.get("/readiness", response_model=ReadinessResponse, responses={503: {"model": ReadinessResponse}})
+        async def readiness_check():
             """Readiness probe - checks if service can handle requests"""
             # Service is ready if we have at least one connected host
             connected_hosts = len([h for h in self.host_manager.hosts.values() if h.status == 'connected'])
             
             if connected_hosts == 0:
-                return jsonify({'status': 'not_ready', 'reason': 'no_connected_hosts'}), 503
+                return JSONResponse(
+                    content={'status': 'not_ready', 'reason': 'no_connected_hosts'},
+                    status_code=503
+                )
             
             # Additional readiness check: ensure we can actually list containers
             try:
                 containers = self.host_manager.get_all_containers()
                 total_containers = sum(len(containers) for containers in containers.values())
                 
-                return jsonify({
-                    'status': 'ready', 
-                    'connected_hosts': connected_hosts,
-                    'total_containers': total_containers
-                }), 200
+                return ReadinessResponse(
+                    status='ready',
+                    connected_hosts=connected_hosts,
+                    total_containers=total_containers
+                )
                 
             except Exception as e:
                 self.logger.error(f"Readiness check failed: {e}")
-                return jsonify({'status': 'not_ready', 'reason': 'container_listing_failed', 'error': str(e)}), 503
+                return JSONResponse(
+                    content={'status': 'not_ready', 'reason': 'container_listing_failed', 'error': str(e)},
+                    status_code=503
+                )
         
-        @app.route('/containers', methods=['GET'])
-        def get_containers():
+        @app.get("/containers", response_model=ContainersResponse)
+        async def get_containers():
             """Get monitored containers"""
-            return jsonify({
-                'containers': list(self.monitored_containers.values()),
-                'count': len(self.monitored_containers)
-            })
+            return ContainersResponse(
+                containers=list(self.monitored_containers.values()),
+                count=len(self.monitored_containers)
+            )
 
-        @app.route('/containers/summary', methods=['GET'])
-        def get_container_summary():
+        @app.get("/containers/summary", response_model=Dict[str, List[Dict[str, Any]]])
+        async def get_container_summary():
             """Get summary of monitored containers"""
             group_key = 'host_ip'
             grouped = {
@@ -369,27 +435,27 @@ class APIServer:
                     for item in self.monitored_containers.values() if item[group_key] == k]
                 for k in set(item[group_key] for item in self.monitored_containers.values())
             }
-            return jsonify(grouped)
+            return grouped
                 
-        @app.route('/containers/<container_id>', methods=['GET'])
-        def get_container(container_id):
+        @app.get("/containers/{container_id}", response_model=Dict[str, Any])
+        async def get_container(container_id: str):
             """Get specific container info"""
             for key, container_data in self.monitored_containers.items():
                 if container_id in key or container_data.get('short_id') == container_id:
-                    return jsonify(container_data)
-            return jsonify({'error': 'Container not found'}), 404
+                    return container_data
+            raise HTTPException(status_code=404, detail="Container not found")
         
-        @app.route('/labels', methods=['GET'])
-        def get_labels():
+        @app.get("/labels", response_model=Dict[str, Dict[str, str]])
+        async def get_labels():
             """Get all snadboy labels from monitored containers"""
             labels = {}
             for container_data in self.monitored_containers.values():
                 container_labels = container_data.get('snadboy_labels', {})
                 labels[container_data['name']] = container_labels
-            return jsonify(labels)
+            return labels
         
-        @app.route('/caddy', methods=['GET'])
-        def get_caddy_config():
+        @app.get("/caddy", response_model=Dict[str, Any])
+        async def get_caddy_config():
             """Get container info formatted for Caddy reverse proxy"""
             caddy_services = []
             for container_data in self.monitored_containers.values():
@@ -428,15 +494,15 @@ class APIServer:
                 
                 caddy_services.append(service_info)
             
-            return jsonify({
+            return {
                 'services': caddy_services,
                 'count': len(caddy_services),
                 'timestamp': datetime.now().isoformat(),
                 'note': 'host_ip is the real machine IP for Caddy routing, primary_docker_ip is internal Docker network IP'
-            })
+            }
         
-        @app.route('/ips', methods=['GET'])
-        def get_container_ips():
+        @app.get("/ips", response_model=Dict[str, Any])
+        async def get_container_ips():
             """Get all container IP addresses"""
             ips = {}
             for container_data in self.monitored_containers.values():
@@ -449,13 +515,13 @@ class APIServer:
                     'docker_networks': container_data.get('docker_networks', {}),
                     'status': container_data['status']
                 }
-            return jsonify({
+            return {
                 'containers': ips,
                 'note': 'host_ip = real machine IP for routing, docker_ips = internal container network IPs'
-            })
+            }
         
-        @app.route('/errors', methods=['GET'])
-        def get_host_errors():
+        @app.get("/errors", response_model=Dict[str, Any])
+        async def get_host_errors():
             """Get detailed information about host connection errors"""
             host_errors = self.host_manager.get_host_errors()
             
@@ -473,15 +539,15 @@ class APIServer:
                     ).isoformat() if host_name in self.host_manager.error_timestamps else None
                 }
             
-            return jsonify({
+            return {
                 'host_errors': error_details,
                 'error_count': len(host_errors),
                 'recovery_candidates': self.host_manager.get_hosts_needing_recovery(),
                 'timestamp': datetime.now().isoformat()
-            })
+            }
         
-        @app.route('/services/schema', methods=['GET'])
-        def get_services_schema():
+        @app.get("/services/schema", response_model=Dict[str, Any])
+        async def get_services_schema():
             """Get supported service types and their schemas"""
             
             if self.container_processor:
@@ -522,7 +588,7 @@ class APIServer:
             # Document planned (unimplemented) service types
             planned_services = get_planned_services()
             
-            return jsonify({
+            return {
                 'implemented_services': service_schemas,
                 'planned_services': planned_services,
                 'service_count': len(service_schemas),
@@ -543,10 +609,10 @@ class APIServer:
                 },
                 'roadmap': 'Additional service types may be implemented based on user requirements. See README.md for detailed planned features.',
                 'timestamp': datetime.now().isoformat()
-            })
+            }
         
-        @app.route('/debug', methods=['GET'])
-        def debug_info():
+        @app.get("/debug", response_model=Dict[str, Any])
+        async def debug_info():
             """Debug endpoint to troubleshoot container detection"""
             debug_data = {
                 'config': {
@@ -597,18 +663,18 @@ class APIServer:
                             'host_type': host.get_type()
                         }
             
-            return jsonify(debug_data)
+            return debug_data
         
-        @app.route('/caddy/status', methods=['GET'])
-        def get_caddy_status():
+        @app.get("/caddy/status", response_model=Dict[str, Any])
+        async def get_caddy_status():
             """Get detailed Caddy integration status"""
             if not self.caddy_manager:
-                return jsonify({
+                return {
                     'enabled': False,
                     'message': 'Caddy integration is disabled'
-                })
+                }
             
-            return jsonify({
+            return {
                 'enabled': True,
                 'available': self.caddy_manager.caddy_available,
                 'admin_url': self.caddy_manager.caddy_admin_url,
@@ -620,7 +686,7 @@ class APIServer:
                     'attempts': self.caddy_manager.retry_attempts,
                     'delay': self.caddy_manager.retry_delay
                 }
-            })
+            }
         
         return app
     
@@ -1423,13 +1489,16 @@ class APIServer:
         '''
     
     def start(self):
-        """Start the Flask API server"""
+        """Start the FastAPI server using uvicorn"""
+        import uvicorn
+        
         api_port = self.config.get('api_port', 8080)
-        self.logger.info(f"Starting API server on port {api_port}")
-        self.app.run(
+        self.logger.info(f"Starting FastAPI server on port {api_port}")
+        
+        uvicorn.run(
+            self.app,
             host='0.0.0.0',
             port=api_port,
-            debug=False,
-            threaded=True,
-            use_reloader=False
+            log_level='warning',  # Reduce uvicorn logging
+            access_log=False  # Disable access logs for cleaner output
         )

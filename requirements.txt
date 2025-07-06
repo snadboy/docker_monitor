@@ -4,8 +4,10 @@
 # Core Docker integration
 docker>=6.0.0
 
-# Web framework for REST API
-flask>=2.0.0
+# FastAPI framework and dependencies
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.0.0
 
 # HTTP client for external APIs (Caddy Admin API)
 requests>=2.25.0

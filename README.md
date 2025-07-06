@@ -56,7 +56,7 @@ docker_monitor/
 ├── docker_hosts.py      # Docker host abstractions (Local/SSH)
 ├── managers.py          # Host manager and SSH setup
 ├── processors.py        # Container processing and Caddy management
-├── api_server.py        # Flask REST API server
+├── api_server.py        # FastAPI REST API server
 └── monitor.py           # Main orchestrator
 ```
 
