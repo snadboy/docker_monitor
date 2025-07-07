@@ -24,7 +24,7 @@ python -m docker_monitor.main --log-level debug
 
 **Start API Server**:
 ```bash
-python -m docker_monitor.main --api --api-port 8080
+python -m docker_monitor.main --api-port 8080
 ```
 
 **Configuration Helper**:
@@ -95,3 +95,20 @@ Key endpoints for integration:
 - `GET /services/schema` - Supported service types
 - `GET /health` - Detailed system health
 - `GET /errors` - Error analysis and recovery status
+
+## Package Structure
+
+This is now a proper Python package with:
+- `docker_monitor/` - Main package directory
+- `setup.py` - Package installation script
+- `requirements.txt` - Dependencies
+- Console entry points: `docker-monitor` and `docker-monitor-config`
+
+## Dashboard
+
+The FastAPI server includes a comprehensive web dashboard at `/dashboard` with:
+- Multi-tab interface (Overview, Containers, Health, Errors, Services)
+- Dark/light theme toggle
+- Real-time data updates
+- Responsive mobile-friendly design
+- Interactive container monitoring

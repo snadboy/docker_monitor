@@ -19,7 +19,7 @@ try:
     from docker_monitor import __version__, __author__, __description__, PACKAGE_INFO
 except ImportError:
     # Fallback if package can't be imported
-    __version__ = "2.5.0-enhanced-health"
+    __version__ = "2.5.0"
     __author__ = "Docker Monitor Team"
     __description__ = "Production-ready Docker container monitoring with enhanced health tracking"
     PACKAGE_INFO = {}
@@ -32,15 +32,6 @@ def read_long_description():
         with open(readme_file, "r", encoding="utf-8") as f:
             return f.read()
     return __description__
-
-# Read requirements from requirements.txt
-def read_requirements(filename="requirements.txt"):
-    """Read requirements from requirements file"""
-    req_file = Path(__file__).parent / filename
-    if req_file.exists():
-        with open(req_file, "r", encoding="utf-8") as f:
-            return [line.strip() for line in f if line.strip() and not line.startswith("#")]
-    return []
 
 # Core dependencies
 INSTALL_REQUIRES = [
@@ -81,109 +72,8 @@ EXTRAS_REQUIRE["all"] = [
     for dep in extra_deps
 ]
 
-# Try to read from requirements.txt if it exists
-requirements_file_deps = read_requirements()
-if requirements_file_deps:
-    INSTALL_REQUIRES = requirements_file_deps
-
-# Package data
-PACKAGE_DATA = {
-    "docker_monitor": [
-        "*.md",
-        "*.txt",
-        "*.yml",
-        "*.yaml",
-        "templates/*.html",
-        "static/*",
-    ]
-}
-
-# Console scripts entry points
-CONSOLE_SCRIPTS = [
-    "docker-monitor=docker_monitor.main:main",
-    "docker-monitor-config=docker_monitor.config:main",
-]
-
-# Python version requirement
-PYTHON_REQUIRES = ">=3.7"
-
-# Classifiers for PyPI
-CLASSIFIERS = [
-    "Development Status :: 4 - Beta",
-    "Intended Audience :: Developers",
-    "Intended Audience :: System Administrators",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.7",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Topic :: System :: Monitoring",
-    "Topic :: System :: Systems Administration",
-    "Topic :: Software Development :: Libraries :: Python Modules",
-    "Environment :: Console",
-    "Environment :: Web Environment",
-]
-
-# Keywords for PyPI
-KEYWORDS = [
-    "docker",
-    "container",
-    "monitoring",
-    "health-check",
-    "ssh",
-    "caddy",
-    "reverse-proxy",
-    "microservices",
-    "devops",
-    "infrastructure",
-    "api",
-    "fastapi",
-    "kubernetes",
-    "docker-compose",
-]
-
-def validate_setup():
-    """Validate setup configuration before building"""
-    errors = []
-    
-    # Check required files
-    required_files = ["docker_monitor/__init__.py"]
-    for file_path in required_files:
-        if not Path(file_path).exists():
-            errors.append(f"Required file missing: {file_path}")
-    
-    # Check Python version
-    if sys.version_info < (3, 7):
-        errors.append(f"Python 3.7+ required, found {sys.version_info.major}.{sys.version_info.minor}")
-    
-    # Check package structure
-    if not Path("docker_monitor").is_dir():
-        errors.append("Package directory 'docker_monitor' not found")
-    
-    if errors:
-        print("❌ Setup validation failed:")
-        for error in errors:
-            print(f"   - {error}")
-        sys.exit(1)
-    else:
-        print("✅ Setup validation passed")
-
 def main():
-    """Main setup function"""
-    # Validate setup before proceeding
-    validate_setup()
-    
-    print(f"Building Enhanced Docker Monitor v{__version__}")
-    print(f"Python version: {sys.version}")
-    print(f"Install requires: {len(INSTALL_REQUIRES)} packages")
-    print(f"Optional extras: {list(EXTRAS_REQUIRE.keys())}")
-    
     setup(
-        # Basic package information
         name="enhanced-docker-monitor",
         version=__version__,
         author=__author__,
@@ -191,45 +81,53 @@ def main():
         description=__description__,
         long_description=read_long_description(),
         long_description_content_type="text/markdown",
-        url="https://github.com/your-org/enhanced-docker-monitor",
+        url="https://github.com/snadboy/docker_monitor",
         project_urls={
-            "Documentation": "https://enhanced-docker-monitor.readthedocs.io/",
-            "Source": "https://github.com/your-org/enhanced-docker-monitor",
-            "Tracker": "https://github.com/your-org/enhanced-docker-monitor/issues",
-            "Changelog": "https://github.com/your-org/enhanced-docker-monitor/blob/main/CHANGELOG.md",
+            "Bug Reports": "https://github.com/snadboy/docker_monitor/issues",
+            "Source": "https://github.com/snadboy/docker_monitor",
+            "Documentation": "https://github.com/snadboy/docker_monitor/blob/main/README.md",
         },
-        
-        # Package discovery and structure
-        packages=find_packages(exclude=["tests", "tests.*", "docs", "docs.*"]),
-        package_data=PACKAGE_DATA,
-        include_package_data=True,
-        zip_safe=False,
-        
-        # Dependencies
-        python_requires=PYTHON_REQUIRES,
+        packages=find_packages(),
+        classifiers=[
+            "Development Status :: 4 - Beta",
+            "Intended Audience :: Developers",
+            "Intended Audience :: System Administrators",
+            "License :: OSI Approved :: MIT License",
+            "Operating System :: OS Independent",
+            "Programming Language :: Python :: 3",
+            "Programming Language :: Python :: 3.7",
+            "Programming Language :: Python :: 3.8",
+            "Programming Language :: Python :: 3.9",
+            "Programming Language :: Python :: 3.10",
+            "Programming Language :: Python :: 3.11",
+            "Programming Language :: Python :: 3.12",
+            "Topic :: Software Development :: Libraries :: Python Modules",
+            "Topic :: System :: Monitoring",
+            "Topic :: System :: Systems Administration",
+        ],
+        python_requires=">=3.7",
         install_requires=INSTALL_REQUIRES,
         extras_require=EXTRAS_REQUIRE,
-        
-        # Entry points
         entry_points={
-            "console_scripts": CONSOLE_SCRIPTS,
+            "console_scripts": [
+                "docker-monitor=docker_monitor.main:main",
+                "docker-monitor-config=docker_monitor.config:print_config_cli",
+            ],
         },
-        
-        # Metadata for PyPI
-        classifiers=CLASSIFIERS,
-        keywords=" ".join(KEYWORDS),
-        license="MIT",
-        platforms=["any"],
-        
-        # Options
-        options={
-            "bdist_wheel": {
-                "universal": False,  # We support Python 3.7+ only
-            },
-        },
-        
-        # Additional metadata
-        cmdclass={},
+        keywords=[
+            "docker",
+            "monitoring",
+            "containers",
+            "microservices",
+            "devops",
+            "infrastructure",
+            "api",
+            "fastapi",
+            "kubernetes",
+            "docker-compose",
+        ],
+        include_package_data=True,
+        zip_safe=False,
     )
 
 if __name__ == "__main__":

@@ -9,7 +9,7 @@ multiple hosts (local and SSH), with real-time event processing, health monitori
 and automatic reverse proxy configuration.
 """
 
-__version__ = "2.5.0-enhanced-health"
+__version__ = "2.5.0"
 __author__ = "Docker Monitor Team"
 __description__ = "Production-ready Docker container monitoring with enhanced health tracking"
 
@@ -62,6 +62,9 @@ __all__ = [
     'get_supported_service_types',
     'get_service_examples',
     'get_planned_services',
+    
+    # Version info
+    'get_version_info',
 ]
 
 
